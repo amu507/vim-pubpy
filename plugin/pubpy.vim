@@ -5,9 +5,20 @@ python << EOF
 import os
 import sys
 from vimenv import env
-sPath=env.var("$VIM")+r"\vimfiles\bundle"
+
+def FormatPathStr(*args):
+    if os.name=="nt":
+        return "\\".join(args)
+    else:
+        return "/".join(args)
+
+if os.name=="nt":
+    sPath=env.var("$VIM")+r"\vimfiles\bundle"
+else:
+    sPath=env.var("$HOME")+r"/.vim/bundle"
+
 for sDir in os.listdir(sPath):
-	sPythonx="%s\\%s\\pythonx"%(sPath,sDir)
+	sPythonx=FormatPathStr(sPath,sDir,"pythonx")
 	if not os.path.isdir(sPythonx):
 		continue
 	if not sPythonx in sys.path:
@@ -24,7 +35,12 @@ function! Reload(...)
 python << EOF
 import xreload
 import sys
+import os
 from vimenv import env
+if os.name=="nt":
+    sSplit="\\"
+else:
+    sSplit="/"
 def DoUppy(sMod):
     if sMod=="":
         sMod=env.var('expand("%:p")')
@@ -32,12 +48,12 @@ def DoUppy(sMod):
             env.message("not py")
             return
         sMod=sMod.replace(".py","")
-        sMod=sMod.replace("\\__init__","")
+        sMod=sMod.replace("%s__init__"%sSplit,"")
         for sPath in sys.path:
             if not sPath in sMod:
                 continue
             sMod=sMod[len(sPath)+1:]
-            sMod=sMod.replace("\\",".")
+            sMod=sMod.replace(sSplit,".")
             break
         env.exe("w")
     exec("import "+sMod)
