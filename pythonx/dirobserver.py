@@ -20,8 +20,6 @@ If a buffer size is passed, the result is a list of (action, filename)
 If a buffer is passed, the result is None - you must use the overlapped object to determine when the information is available and how much is valid. The buffer can then be passed to win32file::FILE_NOTIFY_INFORMATION
 """
 import os
-import win32file
-import win32con
 import threading 
 
 FILE_ACTIONS={
@@ -32,46 +30,49 @@ FILE_ACTIONS={
   5 : "Renamed to something"
 }
 
-DW_NOTIFY_FILTER=win32con.FILE_NOTIFY_CHANGE_FILE_NAME|win32con.FILE_NOTIFY_CHANGE_DIR_NAME|win32con.FILE_NOTIFY_CHANGE_LAST_WRITE
-FILE_LIST_DIRECTORY=win32con.GENERIC_READ|win32con.GENERIC_WRITE
+if os.name=="nt":
+    import win32con
+    import win32file
+    DW_NOTIFY_FILTER=win32con.FILE_NOTIFY_CHANGE_FILE_NAME|win32con.FILE_NOTIFY_CHANGE_DIR_NAME|win32con.FILE_NOTIFY_CHANGE_LAST_WRITE
+    FILE_LIST_DIRECTORY=win32con.GENERIC_READ|win32con.GENERIC_WRITE
 
 class CDirObserver(object):
-	def __init__(self):
-		self.m_Threads=[]
+    def __init__(self):
+        self.m_Threads=[]
 
-	def NewHandle(self,sDir):
-		handle=win32file.CreateFile(
-			sDir,
-			FILE_LIST_DIRECTORY,
-			win32con.FILE_SHARE_READ|win32con.FILE_SHARE_WRITE,
-			None,
-			win32con.OPEN_EXISTING,
-			win32con.FILE_FLAG_BACKUP_SEMANTICS,
-			None
-		)
-		return handle
+    def NewHandle(self,sDir):
+        handle=win32file.CreateFile(
+            sDir,
+            FILE_LIST_DIRECTORY,
+            win32con.FILE_SHARE_READ|win32con.FILE_SHARE_WRITE,
+            None,
+            win32con.OPEN_EXISTING,
+            win32con.FILE_FLAG_BACKUP_SEMANTICS,
+            None
+        )
+        return handle
 
-	def ObserveDir(self,sDir,cb):
-		oThread=threading.Thread(target=self.NewObserver,args=(sDir,cb))
-		self.m_Threads.append(oThread)
-#		oThread.setDaemon(True)
-		oThread.start()
+    def ObserveDir(self,sDir,cb):
+        oThread=threading.Thread(target=self.NewObserver,args=(sDir,cb))
+        self.m_Threads.append(oThread)
+#       oThread.setDaemon(True)
+        oThread.start()
 
-	def NewObserver(self,sDir,cb):
-		handle=self.NewHandle(sDir)
-		while 1:
-			lst=win32file.ReadDirectoryChangesW(handle,1024,True,DW_NOTIFY_FILTER,None,None)
-			fileset=set()
-			for action,file in lst:
-				fileset.add(os.path.join(sDir,file))
-			cb(fileset)
+    def NewObserver(self,sDir,cb):
+        handle=self.NewHandle(sDir)
+        while 1:
+            lst=win32file.ReadDirectoryChangesW(handle,1024,True,DW_NOTIFY_FILTER,None,None)
+            fileset=set()
+            for action,file in lst:
+                fileset.add(os.path.join(sDir,file))
+            cb(fileset)
 
 if not globals().has_key("g_DirObserver"):
-	g_DirObserver=CDirObserver()
+    g_DirObserver=CDirObserver()
 
 def ObserveDir(sDir,cb):
-	g_DirObserver.ObserveDir(sDir,cb)
+    g_DirObserver.ObserveDir(sDir,cb)
 
 def KillAll():
-	for t in g_DirObserver.m_Threads:
-		t._Thread__stop()
+    for t in g_DirObserver.m_Threads:
+        t._Thread__stop()
